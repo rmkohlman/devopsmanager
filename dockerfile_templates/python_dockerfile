@@ -1,0 +1,63 @@
+# Development Stage
+FROM python:latest AS development
+
+ARG USER
+ENV USER=$USER
+
+# Install dependencies
+RUN apt-get update && apt-get install -y curl unzip git build-essential libtool libtool-bin autoconf automake cmake g++ pkg-config unzip gettext
+
+# Clone Neovim repository and checkout the latest release
+RUN git clone https://github.com/neovim/neovim.git && \
+    cd neovim && \
+    git checkout stable && \
+    make CMAKE_BUILD_TYPE=RelWithDebInfo && \
+    make install
+
+# Clean up unnecessary packages and cache
+RUN apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy only necessary files for dependency installation
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --user --no-cache-dir -r requirements.txt
+
+# Set up neovim configurations
+COPY --chown=root:root init.lua /root/.config/nvim/
+
+# Set work directory
+WORKDIR /workspace
+
+# Development image entry point
+CMD ["sh"]
+
+# Production Stage
+FROM python:slim AS production
+
+# Set work directory
+WORKDIR /app
+
+# Copy only necessary files for production
+COPY app/ ./app
+COPY requirements.txt .
+
+# Install production dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Production image entry point
+CMD ["python3", "app/app.py"]
+
+# Final Stage (Alpine-based minimal image)
+FROM alpine:latest
+
+# Set work directory
+WORKDIR /app
+
+# Copy only necessary files from the production stage
+COPY --from=production /app .
+
+# Production image entry point
+CMD ["python3", "app.py"]

@@ -1,0 +1,116 @@
+
+#!/usr/bin/env bats --pretty
+# Load the necessary scripts
+BASE_DIR="$HOME/bin/devman"
+source "$BASE_DIR/colors.sh"
+source "$BASE_DIR/text_decorator.sh"
+
+# Test get_value function with known options
+@test "Get color value for RED" {
+  run get_value "RED"
+  [ "$status" -eq 0 ]
+  [ "$output" = '\033[0;31m' ]
+}
+
+@test "Get effect value for BOLD" {
+  run get_value "BOLD"
+  [ "$status" -eq 0 ]
+  [ "$output" = '\033[1m' ]
+}
+
+@test "Get format value for CLEAR_SCREEN" {
+  run get_value "CLEAR_SCREEN"
+  [ "$status" -eq 0 ]
+  [ "$output" = '\033[2J' ]
+}
+
+# Test get_value function with an invalid option
+@test "Get invalid option" {
+  run get_value "INVALID"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Option not found"* ]]
+}
+
+# Test get_value function with multiple options
+@test "Get values for multiple options" {
+  run get_value "RED BOLD CLEAR_SCREEN"
+  [ "$status" -eq 0 ]
+  [ "$output" = '\033[0;31m \033[1m \033[2J' ]
+}
+
+# Helper function to check if the decoration exists
+decoration_exists() {
+  local decoration_name="$1"
+  [[ -n "${decorations[$decoration_name]}" ]]
+}
+
+# Test creating a decoration with valid options
+@test "Create valid decoration" {
+  create_decoration "my_decoration" "RED BOLD"
+  
+  # Debugging information
+  echo "Decoration created: ${decorations["my_decoration"]}"
+  echo "Expected: ${COLORS[RED]}${EFFECTS[BOLD]}"
+  echo "Decorations array: ${decorations[@]}"
+  
+  # Check if the decoration exists in the decorations array
+  [ "${decorations["my_decoration"]}" = "${COLORS[RED]}${EFFECTS[BOLD]}" ]
+}
+
+# Test creating a decoration with invalid options
+@test "Create decoration with invalid options" {
+  create_decoration "invalid_decoration" "INVALID_OPTION"
+  [ "$status" -ne 0 ]
+  [ "$(decoration_exists "invalid_decoration")" = false ]
+}
+
+# Test applying a decoration to text
+@test "Apply decoration to text" {
+  create_decoration "my_decoration" "RED BOLD"
+  [ "$status" -eq 0 ]
+
+  local text="Hello, World!"
+  local formatted_text=$(apply_decorations "$text" "my_decoration")
+
+  [ "$status" -eq 0 ]
+  [[ "$formatted_text" == *"${COLORS[RED]}${EFFECTS[BOLD]}Hello, World!${FORMATS[RESET]}"* ]]
+}
+
+# Test applying multiple decorations to text
+@test "Apply multiple decorations to text" {
+  local text="Hello, World!"
+
+  # Create decorations with red color and bold effect
+  create_decoration "red_decoration" "RED"
+  create_decoration "bold_decoration" "BOLD"
+
+  # Apply both decorations to the text
+  local formatted_text=$(apply_decorations "$text" "red_decoration" "bold_decoration")
+
+  # Check if the formatted text contains both color and reset codes
+  [ -n "$(decoration_exists "red_decoration")" ]
+  [ -n "$(decoration_exists "bold_decoration")" ]
+  [[ "$formatted_text" == *"${COLORS[RED]}${EFFECTS[BOLD]}Hello, World!${FORMATS[RESET]}"* ]]
+}
+
+# Test applying non-existent decoration to text
+@test "Apply non-existent decoration to text" {
+  local text="Hello, World!"
+  local formatted_text=$(apply_decorations "$text" "non_existent_decoration")
+
+  [ "$status" -eq 0 ]
+  [ "$formatted_text" == "$text" ]
+}
+
+# Test creating and applying multiple decorations
+@test "Create and apply multiple decorations" {
+  create_decoration "red_decoration" "RED"
+  create_decoration "bold_decoration" "BOLD"
+
+  local text="Hello, World!"
+  local formatted_text=$(apply_decorations "$text" "red_decoration" "bold_decoration")
+
+  [ "$status" -eq 0 ]
+  [[ "$formatted_text" == *"${COLORS[RED]}${EFFECTS[BOLD]}Hello, World!${FORMATS[RESET]}"* ]]
+}
+
